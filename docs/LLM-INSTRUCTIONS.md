@@ -17,4 +17,6 @@ Default base URL: `http://127.0.0.1:5173/api/v1`.
 
 For examples, full documents, Undo, and saved-session endpoints, see `docs/API.md`.
 
+To export an image, download `GET /board/export?format=png&orientation=horizontal` (also supports `svg` and `vertical`). Add `expectedRevision=<revision>` to ensure you export the state you reviewed; on 409, reread the board. The response is image bytes, not JSON, with an `X-Board-Revision` header. Export works without a browser and does not edit the board or Undo history. To export a saved session, load its board using the normal `PUT /board` flow first.
+
 To clean a board, use `POST /board/clear` with `{expectedRevision,scope}`. Use `annotations` to remove drawings and equipment while preserving positions; use `reset` to restore both full selected formations and a centred ball; use `everything` to remove every element including all players and the ball. Pitch settings and saved sessions are preserved. The entire clear is one Undo entry.

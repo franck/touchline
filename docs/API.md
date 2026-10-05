@@ -133,6 +133,25 @@ jq -n --argjson revision "$REV" '{expectedRevision: $revision, scope: "annotatio
   curl -sS -X POST "$BASE/board/clear" -H 'Content-Type: application/json' --data-binary @- | jq
 ```
 
+## Image export
+
+`GET /board/export` downloads the current persisted board without requiring an open browser.
+
+| Query parameter | Values | Default |
+|---|---|---|
+| `format` | `png`, `svg` | `png` |
+| `orientation` | `horizontal`, `vertical` | `horizontal` |
+| `expectedRevision` | Optional nonnegative integer | Latest revision |
+
+PNG images have a 2,000-pixel longest edge; SVG images use the same dimensions and can be scaled. Both include the complete pitch, players, ball, equipment, and drawings, excluding UI, selection highlights, and unfinished gestures. Vertical images keep player numbers upright. Empty and partial boards are supported.
+
+Responses use `image/png` or `image/svg+xml`, an attachment filename `touchline-board-r<revision>.<format>`, and `X-Board-Revision` identifying the exported revision. Export does not change the board or Undo history. Invalid query parameters return `422`; a mismatched `expectedRevision` returns the normal `409` snapshot. Browser orientation is local, so API callers must request vertical orientation explicitly.
+
+```sh
+curl --fail --show-error 'http://127.0.0.1:5173/api/v1/board/export' -o board.png
+curl --fail --show-error 'http://127.0.0.1:5173/api/v1/board/export?format=svg&orientation=vertical' -o board.svg
+```
+
 ## Live events
 
 `GET /events` is a server-sent event stream. It immediately sends the current snapshot, then broadcasts snapshots after board or session changes:

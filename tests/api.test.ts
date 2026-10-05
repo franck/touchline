@@ -7,6 +7,24 @@ import {join} from 'node:path';
 import {once} from 'node:events';
 import {applyOperations,clearBoard,defaultDocument,fromDocument,toDocument,validateDocument,type Document} from '../shared/api';
 import {initial,formationNames,resetExistingPositions} from '../shared/board';
+import {exportBoard} from '../server/export';
+
+test('image exports render both layouts, orientations, all elements and empty boards',()=>{
+ const populated=applyOperations(defaultDocument(),{expectedRevision:0,operations:[
+  {action:'add',element:{id:'cone',type:'cone',position:{x:25,y:25},rotation:45}},
+  {action:'add',element:{id:'disc',type:'small-cone',position:{x:35,y:35},rotation:0,color:'blue'}},
+  {action:'add',element:{id:'goal',type:'goal',position:{x:75,y:50},rotation:90}},
+  {action:'add',element:{id:'route',type:'drawing',start:{x:25,y:25},end:{x:75,y:50},style:'dotted',arrow:true}}
+ ]});
+ for(const pitch of ['u8','classic'] as const){for(const vertical of [false,true]){
+  const board={...populated,pitch};const svg=String(exportBoard(board,'svg',vertical));
+  assert.match(svg,/xmlns="http:\/\/www.w3.org\/2000\/svg"/);assert.match(svg,/#58aaf0/);assert.match(svg,/#ff9b38/);assert.match(svg,/rotate\(90\)/);assert.match(svg,/stroke-dasharray="1 11"/);assert.match(svg,/marker-end="url\(#arrowhead\)"/);assert.match(svg,/<text[^>]*>1<\/text>/);assert.doesNotMatch(svg,/stroke-dasharray="5 4"/);
+  if(vertical)assert.match(svg,/translate\(0 1000\) rotate\(-90\)/);
+  const png=Buffer.from(exportBoard(board,'png',vertical));assert.deepEqual([...png.subarray(0,8)],[137,80,78,71,13,10,26,10]);
+  const shortEdge=pitch==='u8'?1465:1200;assert.equal(png.readUInt32BE(16),vertical?shortEdge:2000);assert.equal(png.readUInt32BE(20),vertical?2000:shortEdge);
+  const empty=clearBoard(board,'everything');const emptySvg=String(exportBoard(empty,'svg',vertical));assert.doesNotMatch(emptySvg,/<text/);assert.notDeepEqual(Buffer.from(exportBoard(empty,'png',vertical)),png);
+ }}
+});
 
 test('coordinate round-trip and compatibility with old layouts',()=>{
  const old=initial();delete old.pitch;delete old.teamSize;delete old.equipment;
@@ -61,7 +79,11 @@ test('HTTP edits, conflicts, SSE, undo, sessions, schema, and restart persistenc
   await start();const base=await request('/api/v1/board');assert.equal(base.value.revision,0);
   const abort=new AbortController();const stream=await fetch(`http://127.0.0.1:${port}/api/v1/events`,{signal:abort.signal});const reader=stream.body!.getReader();await reader.read();
   const edited=await request('/api/v1/board/operations','POST',{expectedRevision:0,operations:[{action:'add',element:{id:'disc',type:'small-cone',position:{x:30,y:35},rotation:0,color:'blue'}},{action:'add',element:{id:'route',type:'drawing',start:{x:30,y:35},end:{x:50,y:60},style:'dotted',arrow:true}}]});
-  assert.equal(edited.status,200);assert.equal(edited.value.revision,1);
+   assert.equal(edited.status,200);assert.equal(edited.value.revision,1);
+   const image=await fetch(`http://127.0.0.1:${port}/api/v1/board/export?expectedRevision=1`);assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');assert.equal(image.headers.get('x-board-revision'),'1');assert.match(image.headers.get('content-disposition')!,/touchline-board-r1.png/);assert.equal(Buffer.from(await image.arrayBuffer()).readUInt32BE(16),2000);
+   const svgImage=await fetch(`http://127.0.0.1:${port}/api/v1/board/export?format=svg&orientation=vertical`);assert.equal(svgImage.status,200);assert.match(svgImage.headers.get('content-type')!,/^image\/svg\+xml/);assert.match(await svgImage.text(),/translate\(0 1000\) rotate\(-90\)/);
+   for(const query of ['format=jpg','orientation=diagonal','expectedRevision=-1','expectedRevision=no','unexpected=true','format=png&format=svg'])assert.equal((await request('/api/v1/board/export?'+query)).status,422);
+   assert.equal((await request('/api/v1/board/export?expectedRevision=0')).status,409);assert.deepEqual((await request('/api/v1/board')).value,edited.value);
   const event=await reader.read();assert.match(new TextDecoder().decode(event.value),/"revision":1/);abort.abort();
   assert.equal((await request('/api/v1/board/operations','POST',{expectedRevision:0,operations:[{action:'delete',id:'disc'}]})).status,409);
   const rejected=await request('/api/v1/board/operations','POST',{expectedRevision:1,operations:[{action:'delete',id:'disc'},{action:'update',id:'missing',changes:{position:{x:20,y:20}}}]});assert.equal(rejected.status,422);assert.equal((await request('/api/v1/board')).value.board.elements.length,13);

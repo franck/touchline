@@ -27,6 +27,7 @@ Open http://localhost:5173. This starts both the browser app and the local board
 - **Reset positions** repositions only the players and ball already present; missing players/ball remain absent.
 - **Clear board**: the bottom button removes all players, the ball, equipment, and drawings, leaving only the pitch. Pitch settings and saved sessions are preserved; one Undo restores the prior board. The API also offers annotations-only clearing and full formation reset.
 - **Save session** stores the entire layout under a name on the local server. Select a saved session to reopen it in every connected board.
+- **Export image**: choose PNG or SVG beside Save session. Downloads include the pitch and all committed elements in your current orientation, without selection highlights or controls. PNGs are 2,000 pixels on the longest edge; SVGs remain scalable.
 
 The active board, shared Undo history, and saved sessions are persisted in `data/workspace.json`. Existing browser-local sessions are imported automatically when that browser connects; the original browser copy is retained. Display orientation remains a browser-local preference.
 
@@ -35,6 +36,7 @@ The active board, shared Undo history, and saved sessions are persisted in `data
 An HTTP-capable LLM or coding agent can read and edit the live board at `http://127.0.0.1:5173/api/v1`:
 
 - `GET /board`: current board and revision.
+- `GET /board/export?format=png&orientation=horizontal`: download the current board as PNG or SVG; works without an open browser.
 - `POST /board/operations`: add, update, delete elements, or configure the pitch/teams.
 - `PUT /board`: replace a complete layout.
 - `POST /board/undo`: undo the last API or manual edit.
