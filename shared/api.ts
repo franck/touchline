@@ -5,7 +5,7 @@ const id=z.string().min(1).max(100);
 const position=z.strictObject({x:z.number().min(0).max(100),y:z.number().min(0).max(100)});
 const rotation=z.number().min(0).lt(360);
 const color=z.enum(['red','green','yellow','blue']);
-const player=z.strictObject({id,type:z.literal('player'),team:z.enum(['home','away']),number:z.number().int().min(1).max(11),position});
+const player=z.strictObject({id,type:z.literal('player'),team:z.enum(['home','away','neutral']),number:z.number().int().min(1).max(11),position});
 const ball=z.strictObject({id,type:z.literal('ball'),position});
 const cone=z.strictObject({id,type:z.literal('cone'),position,rotation});
 const smallCone=z.strictObject({id,type:z.literal('small-cone'),position,rotation,color});
@@ -14,6 +14,7 @@ const drawing=z.strictObject({id,type:z.literal('drawing'),start:position,end:po
 export const elementSchema=z.discriminatedUnion('type',[player,ball,cone,smallCone,goal,drawing]);
 const settingsSchema=z.strictObject({pitch:z.enum(['classic','u8']),teamSize:z.union([z.literal(5),z.literal(7),z.literal(11)]),formations:z.strictObject({home:z.string(),away:z.string()})});
 export const documentSchema=settingsSchema.extend({schemaVersion:z.literal(1),elements:z.array(elementSchema).max(2000)});
+export const exportSchema=z.strictObject({board:documentSchema,format:z.enum(['png','svg']).default('png'),orientation:z.enum(['horizontal','vertical']).default('horizontal')});
 const revision=z.number().int().nonnegative();
 export const replaceSchema=z.strictObject({expectedRevision:revision,board:documentSchema});
 export const clearSchema=z.strictObject({expectedRevision:revision,scope:z.enum(['annotations','reset','everything'])});
@@ -37,11 +38,11 @@ export function toDocument(b:Board):Document{
 export function validateDocument(input:unknown):Document{
  const d=documentSchema.parse(input);
  const ids=new Set<string>();for(const e of d.elements){if(ids.has(e.id))throw new Error(`Duplicate element ID: ${e.id}`);ids.add(e.id);}
- if(d.elements.filter(e=>e.type==='ball').length>1)throw new Error('At most one ball is allowed');
- for(const team of ['home','away'] as const){
-  if(!formationNames[d.teamSize].includes(d.formations[team]))throw new Error(`Invalid ${team} formation for ${d.teamSize}-a-side; use ${formationNames[d.teamSize].join(', ')}`);
+ for(const team of ['home','away','neutral'] as const){
+  if(team!=='neutral'&&!formationNames[d.teamSize].includes(d.formations[team]))throw new Error(`Invalid ${team} formation for ${d.teamSize}-a-side; use ${formationNames[d.teamSize].join(', ')}`);
+  const limit=team==='neutral'?11:d.teamSize;
   const ps=d.elements.filter(e=>e.type==='player'&&e.team===team) as z.infer<typeof player>[];
-  if(ps.length>d.teamSize||new Set(ps.map(p=>p.number)).size!==ps.length||ps.some(p=>p.number>d.teamSize))throw new Error(`${team} may have up to ${d.teamSize} players with unique numbers from 1 to ${d.teamSize}`);
+  if(ps.length>limit||new Set(ps.map(p=>p.number)).size!==ps.length||ps.some(p=>p.number>limit))throw new Error(`${team} may have up to ${limit} players with unique numbers from 1 to ${limit}`);
  }
  return d;
 }
@@ -81,9 +82,9 @@ export function clearBoard(current:Document,scope:z.infer<typeof clearSchema>['s
  const b=fromDocument(current);b.drawings=[];b.equipment=[];
  if(scope==='everything')b.players=[];
  if(scope==='reset'){
-  b.players=[...teamPlayers('home',b.home,b.players,boardIds(b)),...teamPlayers('away',b.away,b.players,boardIds(b)),...b.players.filter(p=>p.team==='ball').map(p=>({...p,x:500,y:300}))];
+   b.players=[...teamPlayers('home',b.home,b.players,boardIds(b)),...teamPlayers('away',b.away,b.players,boardIds(b)),...b.players.filter(p=>p.team==='neutral'),...b.players.filter(p=>p.team==='ball').map(p=>({...p,x:500,y:300}))];
   if(!b.players.some(p=>p.team==='ball'))b.players.push({id:b.players.some(p=>p.id==='ball')?crypto.randomUUID():'ball',team:'ball',number:0,x:500,y:300});
  }
  return validateDocument(toDocument(b));
 }
-export const schemaBundle=()=>({schemaVersion:1,coordinates:{range:[0,100],x:'Home goal line to away goal line',y:'Top to bottom touchline in horizontal view',rotation:'Degrees clockwise in horizontal view; 0 points small-goal opening toward positive y'},formations:formationNames,board:z.toJSONSchema(documentSchema),replace:z.toJSONSchema(replaceSchema),operations:z.toJSONSchema(operationsSchema),clear:z.toJSONSchema(clearSchema)});
+export const schemaBundle=()=>({schemaVersion:1,coordinates:{range:[0,100],x:'Home goal line to away goal line',y:'Top to bottom touchline in horizontal view',rotation:'Degrees clockwise in horizontal view; 0 points small-goal opening toward positive y'},formations:formationNames,board:z.toJSONSchema(documentSchema),replace:z.toJSONSchema(replaceSchema),operations:z.toJSONSchema(operationsSchema),clear:z.toJSONSchema(clearSchema),export:z.toJSONSchema(exportSchema,{io:'input'})});

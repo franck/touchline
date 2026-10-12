@@ -33,19 +33,19 @@ function App(){
  const end=()=>{const g=gesture.current;if(!g)return;gesture.current=null;if(g.id&&JSON.stringify(board)!==JSON.stringify(g.before)){update(board);}else if(!g.id&&draft&&Math.hypot(draft.end.x-draft.start.x,draft.end.y-draft.start.y)>8){update({...board,drawings:[...board.drawings,draft]});}setDraft(null);};
  const formation=(team:'home'|'away',f:string)=>{update({...board,[team]:f,players:[...board.players.filter(p=>p.team!==team),...teamPlayers(team,f,board.players,boardIds(board))]});setSelected(null);};
  const teamSize=board.teamSize||5;
- const changeTeamSize=(size:TeamSize)=>{const f=formationNames[size][0];update({...board,teamSize:size,home:f,away:f,players:[...teamPlayers('home',f,board.players,boardIds(board)),...teamPlayers('away',f,board.players,boardIds(board)),...board.players.filter(p=>p.team==='ball')]});setSelected(null);};
+  const changeTeamSize=(size:TeamSize)=>{const f=formationNames[size][0];update({...board,teamSize:size,home:f,away:f,players:[...teamPlayers('home',f,board.players,boardIds(board)),...teamPlayers('away',f,board.players,boardIds(board)),...board.players.filter(p=>p.team==='ball'||p.team==='neutral')]});setSelected(null);};
  const equipment=board.equipment||[];
  const selectedEquipment=equipment.find(item=>item.id===selected);
  const selectedPlayer=board.players.find(item=>item.id===selected);
  const selectedDrawing=board.drawings.find(item=>item.id===selected);
  const homeCount=board.players.filter(p=>p.team==='home').length;
- const awayCount=board.players.filter(p=>p.team==='away').length;
- const hasBall=board.players.some(p=>p.team==='ball');
+  const awayCount=board.players.filter(p=>p.team==='away').length;
+  const neutralCount=board.players.filter(p=>p.team==='neutral').length;
+  const ballCount=board.players.filter(p=>p.team==='ball').length;
  const deleteSelected=()=>{if(!selected)return;update({...board,players:board.players.filter(p=>p.id!==selected),equipment:equipment.filter(e=>e.id!==selected),drawings:board.drawings.filter(d=>d.id!==selected)});setSelected(null);};
  const addPlayer=(team:Player['team'])=>{
-  if(team==='ball'&&hasBall)return;
   const used=new Set(board.players.filter(p=>p.team===team).map(p=>p.number));
-  const number=team==='ball'?0:Array.from({length:teamSize},(_,i)=>i+1).find(n=>!used.has(n));if(number===undefined)return;
+   const number=team==='ball'?0:Array.from({length:team==='neutral'?11:teamSize},(_,i)=>i+1).find(n=>!used.has(n));if(number===undefined)return;
   const player:Player={id:crypto.randomUUID(),team,number,x:500,y:300};update({...board,players:[...board.players,player]});setTool('move');setSelected(player.id);
  };
  const addEquipment=(type:Equipment['type'])=>{const item:Equipment={id:crypto.randomUUID(),type,x:500,y:300,rotation:0,...(type==='small-cone'?{color:'red' as const}:{})};update({...board,equipment:[...equipment,item]});setTool('move');setSelected(item.id);};
@@ -55,7 +55,7 @@ function App(){
  <main className={!ready||busy?'workspace-locked':''} aria-busy={!ready||busy}>
   <div className={`workspace ${vertical?'vertical-workspace':''}`}><section className="board-section"><div className="board-top"><div className="session-title"><span className="live-dot"/>{title}<span className="session-type">Tactical session</span></div><div className="board-actions"><button className="orientation-button" aria-label="Rotate pitch" aria-pressed={vertical} onClick={toggleOrientation}><RotateCcw size={15}/>{vertical?'Bottom → top':'Left → right'}</button><select className="export-select" aria-label="Export image" value="" disabled={!ready||busy||exporting} onChange={e=>{if(e.target.value)void exportImage(e.target.value as 'png'|'svg');}}><option value="" disabled>{exporting?'Exporting…':'Export image'}</option><option value="png">Download PNG</option><option value="svg">Download SVG</option></select><button className="button save-button" onClick={()=>{setName(title==='Untitled session'?'':title);setSaveOpen(true);}}><Save size={15}/>Save session</button></div></div>
  <div className="pitch-layout-bar"><label htmlFor="pitch-layout">Pitch layout</label><div className="select-wrap"><select id="pitch-layout" value={board.pitch||'classic'} onChange={e=>update({...board,pitch:e.target.value as 'classic'|'u8'})}><option value="u8">U8 France · 35 × 25 m</option><option value="classic">Classic</option></select><ChevronDown size={15}/></div>{u8&&<span>Relance protégée · 8 m · Goals 4 m</span>}</div>
- <div className={`pitch-surround ${vertical?'vertical-pitch':''}`}><div className="pitch-label"><span>{vertical?'AWAY':'HOME'} <i className={vertical?'away-dot':'home-dot'}/></span>{!vertical&&<span>AWAY <i className="away-dot"/></span>}</div><svg ref={svg} className={`pitch tool-${tool}`} viewBox={vertical?`0 0 ${pitchHeight} 1000`:`0 0 1000 ${pitchHeight}`} role="img" aria-label={`Interactive ${u8?'U8 France 35 by 25 metre':'classic'} football pitch, home attacks ${vertical?'bottom to top':'left to right'}, with ${homeCount+awayCount} player magnets and ${hasBall?'a ball':'no ball'}`} onPointerDown={e=>start(e)} onPointerMove={move} onPointerUp={end} onPointerCancel={()=>{if(gesture.current)setBoard(gesture.current.before);gesture.current=null;setDraft(null);}}>
+   <div className={`pitch-surround ${vertical?'vertical-pitch':''}`}><div className="pitch-label"><span>{vertical?'AWAY':'HOME'} <i className={vertical?'away-dot':'home-dot'}/></span>{!vertical&&<span>AWAY <i className="away-dot"/></span>}</div><svg ref={svg} className={`pitch tool-${tool}`} viewBox={vertical?`0 0 ${pitchHeight} 1000`:`0 0 1000 ${pitchHeight}`} role="img" aria-label={`Interactive ${u8?'U8 France 35 by 25 metre':'classic'} football pitch, home attacks ${vertical?'bottom to top':'left to right'}, with ${homeCount+awayCount+neutralCount} player magnets and ${ballCount} ${ballCount===1?'ball':'balls'}`} onPointerDown={e=>start(e)} onPointerMove={move} onPointerUp={end} onPointerCancel={()=>{if(gesture.current)setBoard(gesture.current.before);gesture.current=null;setDraft(null);}}>
   <g ref={pitchContent} transform={vertical?'translate(0 1000) rotate(-90)':undefined}>
   <PitchMarkings board={board}/>
   {board.drawings.map(d=>line(d))}{draft&&line(draft,true)}{board.players.map(p=><g key={p.id} data-team={p.team} data-number={p.number} aria-label={p.team==='ball'?'Ball':`${p.team} player ${p.number}`} transform={`translate(${p.x},${displayY(p.y)})`} className="magnet" onPointerDown={e=>{e.stopPropagation();start(e,p.id);}} filter="url(#shadow)">{selected===p.id&&<circle r={p.team==='ball'?21:30} fill="none" stroke="#f7cf73" strokeWidth="2" strokeDasharray="5 4" pointerEvents="none"/>}<PlayerArtwork player={p} vertical={vertical}/></g>)}
@@ -81,8 +81,9 @@ function App(){
  <p className="panel-description">Add elements, then drag them into place.</p>
  <div className="equipment-add player-add">
  <button disabled={homeCount>=teamSize} onClick={()=>addPlayer('home')}><span aria-hidden="true" className="home-dot"/>Add home player</button>
- <button disabled={awayCount>=teamSize} onClick={()=>addPlayer('away')}><span aria-hidden="true" className="away-dot"/>Add away player</button>
- <button disabled={hasBall} onClick={()=>addPlayer('ball')}><span aria-hidden="true">⚽</span>Add ball</button>
+  <button disabled={awayCount>=teamSize} onClick={()=>addPlayer('away')}><span aria-hidden="true" className="away-dot"/>Add away player</button>
+  <button disabled={neutralCount>=11} onClick={()=>addPlayer('neutral')}><span aria-hidden="true" className="neutral-dot"/>Add neutral player</button>
+  <button onClick={()=>addPlayer('ball')}><span aria-hidden="true">⚽</span>Add ball</button>
  </div>
  <div className="equipment-add"><button onClick={()=>addEquipment('cone')}><span aria-hidden="true" className="cone-symbol">▲</span>Add cone</button><button onClick={()=>addEquipment('small-cone')}><span aria-hidden="true" className="disc-symbol">◉</span>Add small cone</button><button onClick={()=>addEquipment('goal')}><span aria-hidden="true" className="goal-symbol">⊓</span>Add small goal</button></div>
  {selectedPlayer?<div className="equipment-controls"><span>Selected: {selectedPlayer.team==='ball'?'ball':`${selectedPlayer.team} player ${selectedPlayer.number}`}</span><div><button className="orientation-button" aria-label="Delete selected player or ball" onClick={deleteSelected}><Trash2 size={14}/>Delete</button></div></div>:selectedEquipment?<div className="equipment-controls">

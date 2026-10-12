@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
 import {exportBoard} from './export';
-import {applyOperations,clearBoard,clearSchema,defaultDocument,fromDocument,toDocument,replaceSchema,operationsSchema,schemaBundle,validateDocument,type Document} from '../shared/api';
+import {applyOperations,clearBoard,clearSchema,defaultDocument,exportSchema,fromDocument,toDocument,replaceSchema,operationsSchema,schemaBundle,validateDocument,type Document} from '../shared/api';
 
 const root=fileURLToPath(new URL('..',import.meta.url));
 const dataDir=process.env.BOARD_DATA_DIR?resolve(process.env.BOARD_DATA_DIR):resolve(root,'data');
@@ -31,6 +31,11 @@ app.get('/api/v1/board/export',(req,res,next)=>{try{
  res.set({'Content-Type':input.format==='png'?'image/png':'image/svg+xml','Content-Disposition':`attachment; filename="touchline-board-r${revision}.${input.format}"`,'X-Board-Revision':String(revision)}).send(image);
  }catch(e){next(e);}});
 app.get('/api/v1/schema',(_req,res)=>res.json(schemaBundle()));
+app.post('/api/v1/board/export',(req,res,next)=>{try{
+ const input=exportSchema.parse(req.body);
+ const image=exportBoard(validateDocument(input.board),input.format,input.orientation==='vertical');
+ res.set({'Content-Type':input.format==='png'?'image/png':'image/svg+xml','Content-Disposition':`attachment; filename="touchline-board.${input.format}"`}).send(image);
+ }catch(e){next(e);}});
 app.put('/api/v1/board',(req,res,next)=>{try{const input=replaceSchema.parse(req.body);checkRevision(input.expectedRevision);res.json(commit(validateDocument(input.board)));}catch(e){next(e);}});
 app.post('/api/v1/board/operations',(req,res,next)=>{try{const input=operationsSchema.parse(req.body);checkRevision(input.expectedRevision);res.json(commit(applyOperations(state.board,input)));}catch(e){next(e);}});
 app.post('/api/v1/board/clear',(req,res,next)=>{try{const input=clearSchema.parse(req.body);checkRevision(input.expectedRevision);res.json(commit(clearBoard(state.board,input.scope)));}catch(e){next(e);}});

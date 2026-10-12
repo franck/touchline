@@ -1,5 +1,5 @@
 export type Point = {x:number;y:number};
-export type Player = Point & {id:string;team:'home'|'away'|'ball';number:number};
+export type Player = Point & {id:string;team:'home'|'away'|'neutral'|'ball';number:number};
 export type Drawing = {id:string;start:Point;end:Point;arrow:boolean;dotted?:boolean};
 export type ConeColor='red'|'green'|'yellow'|'blue';
 export type Equipment = Point & {id:string;type:'cone'|'goal'|'small-cone';rotation:number;color?:ConeColor};
@@ -15,6 +15,6 @@ export function teamPlayers(team:'home'|'away',formation:string,existing:Player[
 }
 export const boardIds=(b:Board)=>[...b.players,...b.drawings,...(b.equipment||[])].map(e=>e.id);
 export function resetExistingPositions(b:Board):Board{
- return {...b,players:b.players.map(p=>{if(p.team==='ball')return {...p,x:500,y:300};const position=shapes[b[p.team]][p.number-1];return {...p,x:p.team==='away'?1000-position.x:position.x,y:position.y};})};
+ return {...b,players:b.players.map(p=>{if(p.team==='neutral')return p;if(p.team==='ball')return {...p,x:500,y:300};const position=shapes[b[p.team]][p.number-1];return {...p,x:p.team==='away'?1000-position.x:position.x,y:position.y};})};
 }
 export const initial=():Board=>({players:[...teamPlayers('home','1–2–1'),...teamPlayers('away','1–2–1'),{id:'ball',team:'ball',number:0,x:500,y:300}],drawings:[],home:'1–2–1',away:'1–2–1',pitch:'u8',teamSize:5,equipment:[]});

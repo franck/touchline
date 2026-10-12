@@ -42,7 +42,7 @@ test('operation validation is atomic, preserves IDs, and supports every formatio
  }}
  assert.throws(()=>validateDocument({...current,elements:[...current.elements,current.elements[0]]}),/Duplicate/);
  assert.equal(applyOperations(current,{expectedRevision:0,operations:[{action:'delete',id:'ball'}]}).elements.filter(e=>e.type==='ball').length,0);
- assert.throws(()=>applyOperations(current,{expectedRevision:0,operations:[{action:'add',element:{id:'extra-ball',type:'ball',position:{x:50,y:50}}}]}),/At most one ball/);
+  assert.equal(applyOperations(current,{expectedRevision:0,operations:[{action:'add',element:{id:'extra-ball',type:'ball',position:{x:50,y:50}}}]}).elements.filter(e=>e.type==='ball').length,2);
  assert.throws(()=>applyOperations(current,{expectedRevision:0,operations:[{action:'update',id:'ball',changes:{color:'red'}}]}));
 });
 test('clearing preserves custom IDs and settings and resets the selected formations',()=>{
